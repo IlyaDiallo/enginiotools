@@ -1,7 +1,7 @@
 QT       += core gui widgets enginio
 
 CONFIG += C++11
-TARGET = enginiotools
+TARGET = garagio
 TEMPLATE = app
 
 
@@ -10,5 +10,5 @@ SOURCES += main.cpp\
 
 HEADERS  += mainwindow.h
 
-TRANSLATIONS = enginiotools_fr_FR.ts
+TRANSLATIONS = garagio_fr_FR.ts
     
