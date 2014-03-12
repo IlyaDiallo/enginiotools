@@ -29,7 +29,7 @@ MainWindow::MainWindow(QWidget *parent)
 {
   QCoreApplication::setOrganizationName("DBooker");
   QCoreApplication::setOrganizationDomain("www.d-booker.fr");
-  QCoreApplication::setApplicationName("Enginio Toolbox");
+  QCoreApplication::setApplicationName("Garagio");
   QHBoxLayout *outerLayout = new QHBoxLayout(this);
   QWidget *mainWidget = new QWidget;
   QVBoxLayout *mainWidgetLayout = new QVBoxLayout(mainWidget);
