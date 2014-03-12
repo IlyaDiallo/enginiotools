@@ -280,6 +280,7 @@ bool MainWindow::setObjectFilter(QJsonObject *o, const QString &filterText)
       return false;
     }
     o->insert("query", filter.object());
+    o->insert("limit", 999);
   }
   return true;
 }
