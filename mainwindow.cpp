@@ -24,6 +24,10 @@
 #include "mainwindow.h"
 
 
+int _queryLimit = 999;
+int _pageCount = 0;
+
+
 MainWindow::MainWindow(QWidget *parent)
   : QDialog(parent)
 {
@@ -212,16 +216,31 @@ void MainWindow::enginioFinished(EnginioReply *msg)
   logDebug(QJsonDocument(msg->data()).toJson());
 
   if(msg == m_exportReply) {
+
     QJsonArray jsonArray(m_exportReply->data().value("results").toArray());
+    int dataCount = jsonArray.size();
+
     QByteArray jsonText = QJsonDocument(jsonArray).toJson();
     QFile exportFile(m_exportFile->text());
-    bool ok = exportFile.open(QIODevice::WriteOnly);
+    QIODevice::OpenMode mode = QIODevice::WriteOnly;
+    if( _pageCount > 0 ) {
+        mode |= QIODevice::Append;
+    }
+    bool ok = exportFile.open(mode);
     if(ok) {
       exportFile.write(jsonText);
       log(tr("%1 object(s) exported to %2").arg(jsonArray.size()).arg(exportFile.fileName()));
     }
     else {
       logError(tr("Error %1 opening file %2").arg(exportFile.error()).arg(exportFile.fileName()));
+    }
+
+    if(ok && dataCount == _queryLimit) {
+        _pageCount ++;
+        onExport();
+    }
+    else {
+        _pageCount = 0;
     }
   }
 
@@ -280,8 +299,13 @@ bool MainWindow::setObjectFilter(QJsonObject *o, const QString &filterText)
       return false;
     }
     o->insert("query", filter.object());
-    o->insert("limit", 999);
   }
+
+  o->insert("limit", _queryLimit);
+  if(_pageCount > 0) {
+      o->insert("offset", _queryLimit * _pageCount);
+  }
+
   return true;
 }
 

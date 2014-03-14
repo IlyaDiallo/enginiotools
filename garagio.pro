@@ -1,6 +1,7 @@
 QT       += core gui widgets enginio
 
 CONFIG += C++11
+CONFIG += debug
 TARGET = garagio
 TEMPLATE = app
 
