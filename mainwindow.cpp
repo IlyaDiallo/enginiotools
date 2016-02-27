@@ -283,7 +283,7 @@ void MainWindow::setObjectType(QJsonObject *o)
   QString objectType = m_objectType->text();
 
   QLatin1String objectPrefix("objects.");
-  if(!objectType.startsWith(objectPrefix)) {
+  if(!objectType.startsWith(objectPrefix) && objectType != "users" ) {
     objectType.prepend(objectPrefix);
   }
   o->insert("objectType", objectType);
