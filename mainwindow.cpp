@@ -220,8 +220,6 @@ void MainWindow::enginioFinished(EnginioReply *msg)
     QJsonArray jsonArray(m_exportReply->data().value("results").toArray());
     int dataCount = jsonArray.size();
 
-    QByteArray jsonText = QJsonDocument(jsonArray).toJson();
-
     QString exportFileName = m_exportFile->text().split('.').first();
     if( _pageCount > 0 ) {
         exportFileName += QString("-%1").arg( _pageCount );
@@ -231,8 +229,23 @@ void MainWindow::enginioFinished(EnginioReply *msg)
     QIODevice::OpenMode mode = QIODevice::WriteOnly;
     bool ok = exportFile.open(mode);
     if(ok) {
-      exportFile.write(jsonText);
-      log(tr("%1 object(s) exported to %2").arg(jsonArray.size()).arg(exportFile.fileName()));
+        exportFile.write("[\n");
+        bool first = true;
+        foreach(const QJsonValue &v, jsonArray) {
+            if( !first ) {
+                exportFile.write(",");
+            }
+            first = false;
+            QJsonObject object(v.toObject());
+            object.remove("creator");
+            object.remove("createdAt");
+            object.remove("updatedAt");
+            QByteArray jsonText = QJsonDocument(object).toJson();
+            exportFile.write(jsonText);
+        }
+        exportFile.write("\n]");
+
+        log(tr("%1 object(s) exported to %2").arg(jsonArray.size()).arg(exportFile.fileName()));
     }
     else {
       logError(tr("Error %1 opening file %2").arg(exportFile.error()).arg(exportFile.fileName()));
@@ -337,6 +350,7 @@ void MainWindow::onImport()
     if(v.isObject()) {
       QJsonObject object(v.toObject());
       setObjectType(&object);
+      object.remove("creator");
       object.remove("createdAt");
       object.remove("updatedAt");
       if(create) {
