@@ -221,11 +221,14 @@ void MainWindow::enginioFinished(EnginioReply *msg)
     int dataCount = jsonArray.size();
 
     QByteArray jsonText = QJsonDocument(jsonArray).toJson();
-    QFile exportFile(m_exportFile->text());
-    QIODevice::OpenMode mode = QIODevice::WriteOnly;
+
+    QString exportFileName = m_exportFile->text().split('.').first();
     if( _pageCount > 0 ) {
-        mode |= QIODevice::Append;
+        exportFileName += QString("-%1").arg( _pageCount );
     }
+    QFile exportFile(exportFileName + ".json");
+
+    QIODevice::OpenMode mode = QIODevice::WriteOnly;
     bool ok = exportFile.open(mode);
     if(ok) {
       exportFile.write(jsonText);
