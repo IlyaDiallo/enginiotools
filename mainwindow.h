@@ -13,8 +13,8 @@ class QListWidget;
 class QFormLayout;
 class QCheckBox;
 class QRadioButton;
-class EnginioClient;
-class EnginioReply;
+class Parse;
+class QNetworkReply;
 class QJsonObject;
 
 class MainWindow : public QDialog
@@ -47,15 +47,15 @@ private:
   QCheckBox       *m_debugMode;
   QPlainTextEdit  *m_log;
 
-  EnginioClient *m_client;
-  QPointer<EnginioReply> m_exportReply;
-  QPointer<EnginioReply> m_queryForRemovalReply;
+  Parse *m_client;
+  QPointer<QNetworkReply> m_exportReply;
+  QPointer<QNetworkReply> m_queryForRemovalReply;
 
   void log(const QString &msg);
   void logError(const QString &error);
   void logDebug(const QString &msg);
-  void enginioError(EnginioReply *enginioError);
-  void enginioFinished(EnginioReply *msg);
+  void backendError(QString msg);
+  void onQuerySucceeded(QHash<int, QByteArray> _roles, QVector<QVariantMap> _data, QNetworkReply *msg);
 
   void setClientBackend();
   void setObjectType(QJsonObject *o);

@@ -1,6 +1,5 @@
 
-#include <Enginio/enginioclient.h>
-#include <Enginio/enginioreply.h>
+#include "../QtQML-BaaS/plugin/src/parse.h"
 
 #include <QJsonDocument>
 #include <QJsonArray>
@@ -60,11 +59,15 @@ MainWindow::MainWindow(QWidget *parent)
   connect(m_exportFileButton, &QPushButton::clicked, this, &MainWindow::onExportFile);
   connect(m_exportButton, &QPushButton::clicked, this, &MainWindow::onExport);
   connect(m_removeButton, &QPushButton::clicked, this, &MainWindow::onRemove);
-  m_client = new EnginioClient(this);
 
-  connect(m_client, &EnginioClient::error, this, &MainWindow::enginioError);
-  connect(m_client, &EnginioClient::finished, this, &MainWindow::enginioFinished);
+  m_client = new Parse();
+  m_client->setParent(this);
+  m_client->setHostURI("https://parse-on-bluemix-gadlim-1825.eu-gb.mybluemix.net"); // temp
+  //m_client->setHostURI("http://localhost:1337"); // temp
+  m_client->setExtraHostURI(""); // TODO param
 
+  connect(m_client, &BaaS::queryFailed, this, &MainWindow::backendError);
+  connect(m_client, &BaaS::querySucceeded, this, &MainWindow::onQuerySucceeded);
 }
 
 
@@ -202,23 +205,18 @@ void MainWindow::logDebug(const QString &msg)
   }
 }
 
-void MainWindow::enginioError(EnginioReply *error)
+void MainWindow::backendError(QString msg)
 {
-  logError(error->errorString());
+  logError(msg);
 }
 
-void MainWindow::enginioFinished(EnginioReply *msg)
+void MainWindow::onQuerySucceeded(QHash<int, QByteArray> _roles, QVector<QVariantMap> data, QNetworkReply *msg)
 {
-  if(msg->errorType() != Enginio::ErrorType::NoError) {
-    return;
-  }
-
-  logDebug(QJsonDocument(msg->data()).toJson());
+  Q_UNUSED(_roles);
 
   if(msg == m_exportReply) {
 
-    QJsonArray jsonArray(m_exportReply->data().value("results").toArray());
-    int dataCount = jsonArray.size();
+    int dataCount = data.size();
 
     QString exportFileName = m_exportFile->text().split('.').first();
     if( _pageCount > 0 ) {
@@ -231,21 +229,23 @@ void MainWindow::enginioFinished(EnginioReply *msg)
     if(ok) {
         exportFile.write("[\n");
         bool first = true;
-        foreach(const QJsonValue &v, jsonArray) {
+        foreach(const QVariantMap &v, data) {
             if( !first ) {
                 exportFile.write(",");
             }
             first = false;
-            QJsonObject object(v.toObject());
+            QJsonObject object = QJsonObject::fromVariantMap(v);
             object.remove("creator");
             object.remove("createdAt");
             object.remove("updatedAt");
             QByteArray jsonText = QJsonDocument(object).toJson();
             exportFile.write(jsonText);
+
+            logDebug(jsonText);
         }
         exportFile.write("\n]");
 
-        log(tr("%1 object(s) exported to %2").arg(jsonArray.size()).arg(exportFile.fileName()));
+        log(tr("%1 object(s) exported to %2").arg(data.size()).arg(exportFile.fileName()));
     }
     else {
       logError(tr("Error %1 opening file %2").arg(exportFile.error()).arg(exportFile.fileName()));
@@ -261,13 +261,12 @@ void MainWindow::enginioFinished(EnginioReply *msg)
   }
 
   if(msg == m_queryForRemovalReply) {
-    QJsonArray jsonArray(m_queryForRemovalReply->data().value("results").toArray());
-    foreach(const QJsonValue &v, jsonArray) {
-      QJsonObject removeObject(v.toObject());
+    foreach(const QVariantMap &v, data) {
+      QJsonObject removeObject = QJsonObject::fromVariantMap(v);
       setObjectType(&removeObject);
-      m_client->remove(removeObject);
+      m_client->deleteObject(QJsonDocument(removeObject).toJson());
     }
-    log(tr("Request to remove %1 object(s)").arg(jsonArray.size()));
+    log(tr("Request to remove %1 object(s)").arg(data.size()));
   }
 
   msg->deleteLater();
@@ -291,18 +290,15 @@ void MainWindow::onExportFile()
 
 void MainWindow::setClientBackend()
 {
-  m_client->setBackendId(m_backendId->text().toUtf8());
+  //m_client->setBackendId(m_backendId->text().toUtf8());
+  m_client->setApplicationId(m_backendId->text().toUtf8());
+
 }
 
 void MainWindow::setObjectType(QJsonObject *o)
 {
-  QString objectType = m_objectType->text();
-
-  QLatin1String objectPrefix("objects.");
-  if(!objectType.startsWith(objectPrefix) && objectType != "users" ) {
-    objectType.prepend(objectPrefix);
-  }
-  o->insert("objectType", objectType);
+  Q_UNUSED(o);
+  m_client->setEndPoint(m_objectType->text());
 }
 
 bool MainWindow::setObjectFilter(QJsonObject *o, const QString &filterText)
@@ -349,16 +345,24 @@ void MainWindow::onImport()
   foreach(const QJsonValue &v, jsonArray) {
     if(v.isObject()) {
       QJsonObject object(v.toObject());
+
+      foreach(const QString &key, object.keys()) {
+          if(object[key].isObject() && object[key].toObject().isEmpty()) {
+              object.remove(key);
+          }
+      }
+
       setObjectType(&object);
       object.remove("creator");
       object.remove("createdAt");
       object.remove("updatedAt");
       if(create) {
         object.remove("id");
-        m_client->create(object);
+        object.remove("objectId");
+        m_client->create(QJsonDocument(object).toJson());
       }
       else {
-        m_client->update(object);
+        m_client->update(QJsonDocument(object).toJson());
       }
     }
   }
@@ -378,7 +382,13 @@ void MainWindow::onExport()
     return;
   }
 
-  m_exportReply = m_client->query(queryObject);
+  QString where = QString(QJsonDocument( queryObject.value("query").toObject() ).toJson() );
+
+  QUrlQuery urlQuery;
+  urlQuery.addQueryItem("where", where);
+  urlQuery.addQueryItem("limit", QString("%1").arg(queryObject.value("limit").toInt()));
+
+  m_exportReply = m_client->query(m_objectType->text(), urlQuery);
 }
 
 void MainWindow::onRemove()
@@ -392,6 +402,6 @@ void MainWindow::onRemove()
     return;
   }
 
-  m_queryForRemovalReply = m_client->query(queryObject);
+  m_queryForRemovalReply = m_client->query(m_objectType->text(), QUrlQuery(QJsonDocument(queryObject).toJson()));
 }
 
